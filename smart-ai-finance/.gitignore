@@ -8,14 +8,11 @@ node_modules/
 
 # Build files
 dist/
-client/dist/
-
-# Vercel
-.vercel/
+build/
 
 # Logs
 *.log
 
-# OS files
-.DS_Store
-Thumbs.db
+# IDE
+.vscode/
+.idea/
