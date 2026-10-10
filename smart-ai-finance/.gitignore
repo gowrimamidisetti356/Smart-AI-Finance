@@ -9,6 +9,10 @@ node_modules/
 # Build files
 dist/
 build/
+client/dist/
+
+# Vercel
+.vercel/
 
 # Logs
 *.log

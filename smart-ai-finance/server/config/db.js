@@ -66,15 +66,10 @@ const initDb = async () => {
 };
 
 const connectDB = async () => {
-  try {
-    await pool.query('SELECT NOW()');
-    console.log('Neon PostgreSQL Connected');
-    await initDb();
-    console.log('Neon PostgreSQL Tables Initialized');
-  } catch (error) {
-    console.error(`Error connecting to Neon Database:`, error);
-    process.exit(1);
-  }
+  await pool.query('SELECT NOW()');
+  console.log('Neon PostgreSQL Connected');
+  await initDb();
+  console.log('Neon PostgreSQL Tables Initialized');
 };
 
 module.exports = { pool, connectDB };
