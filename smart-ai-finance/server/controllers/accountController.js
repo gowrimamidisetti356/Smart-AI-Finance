@@ -1,39 +1,60 @@
-const { pool } = require('../config/db');
+const mongoose = require('mongoose');
+const Account = require('../models/Account');
+const serializeDocument = require('../utils/serializeDocument');
+
+const accountAliases = {
+  bankName: 'bank_name',
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+};
 
 exports.getAccounts = async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT * FROM accounts WHERE user_id = $1 ORDER BY created_at DESC', [req.user.id]);
-    res.json(rows);
+    const accounts = await Account.find({ userId: req.user.id }).sort({ createdAt: -1 });
+    res.json(accounts.map(account => serializeDocument(account, accountAliases)));
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Fetching accounts failed:', error);
+    res.status(500).json({ message: 'Unable to fetch accounts' });
   }
 };
 
 exports.addAccount = async (req, res) => {
-  const { type, bankName, details, balance } = req.body;
+  const { type, bankName, details, balance } = req.body || {};
+  if (typeof type !== 'string' || !type.trim()
+    || (details !== undefined && (details === null || typeof details !== 'object' || Array.isArray(details)))
+    || (balance !== undefined && !Number.isFinite(Number(balance)))) {
+    return res.status(400).json({ message: 'A type, valid details object, and numeric balance are required' });
+  }
+
   try {
-    const { rows } = await pool.query(
-      'INSERT INTO accounts (user_id, type, bank_name, details, balance) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [req.user.id, type, type === 'bank' ? bankName || details?.bankName || null : null, details || {}, balance || 0]
-    );
-    res.status(201).json(rows[0]);
+    const account = await Account.create({
+      userId: req.user.id,
+      type: type.trim(),
+      bankName: type.trim() === 'bank' ? bankName || details?.bankName || null : null,
+      details: details || {},
+      balance: balance === undefined ? 0 : Number(balance),
+    });
+    res.status(201).json(serializeDocument(account, accountAliases));
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    if (error.name === 'ValidationError' || error.name === 'CastError') {
+      return res.status(400).json({ message: 'Invalid account data' });
+    }
+    console.error('Creating account failed:', error);
+    res.status(500).json({ message: 'Unable to create account' });
   }
 };
 
 exports.deleteAccount = async (req, res) => {
-  try {
-    const { rows } = await pool.query('SELECT * FROM accounts WHERE id = $1', [req.params.id]);
-    if (rows.length === 0) return res.status(404).json({ message: 'Account not found' });
-    
-    if (rows[0].user_id !== req.user.id) {
-      return res.status(401).json({ message: 'User not authorized' });
-    }
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(400).json({ message: 'Invalid account ID' });
+  }
 
-    await pool.query('DELETE FROM accounts WHERE id = $1', [req.params.id]);
-    res.json({ id: req.params.id });
+  try {
+    const account = await Account.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
+    if (!account) return res.status(404).json({ message: 'Account not found' });
+    res.json({ id: account.id });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Deleting account failed:', error);
+    res.status(500).json({ message: 'Unable to delete account' });
   }
 };

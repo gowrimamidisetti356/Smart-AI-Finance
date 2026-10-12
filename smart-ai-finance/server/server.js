@@ -18,9 +18,17 @@ app.use('/api', async (req, res, next) => {
     next();
   } catch (error) {
     dbInitialization = undefined;
-    console.error('Error initializing database:', error);
-    res.status(503).json({ message: 'Database unavailable' });
+    console.error('Error initializing database:', error.message);
+    res.status(503).json({
+      message: error.code === 'DATABASE_CONFIG'
+        ? error.message
+        : 'Database unavailable. Check MONGODB_URI credentials and MongoDB Atlas network access.',
+    });
   }
+});
+
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', database: 'connected' });
 });
 
 // Import Routes

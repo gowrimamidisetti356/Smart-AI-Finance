@@ -21,6 +21,15 @@ npm install
 npm start
 ```
 
+Configure the backend before starting it by copying `server/.env.example` to
+`server/.env` and setting `MONGODB_URI` to a MongoDB connection string and
+`JWT_SECRET` to a private signing secret. `OPENAI_API_KEY` is optional; without
+it, the assistant uses its built-in contextual responses. The database-backed
+API health check is available at `http://localhost:5000/api/health`. For
+MongoDB Atlas, allowlist the machine's public IP address so the local server can
+reach the cluster. `MONGO_URI` is also accepted as a compatibility alias for
+`MONGODB_URI`.
+
 ---
 
 # React + Vite

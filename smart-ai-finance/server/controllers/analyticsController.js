@@ -1,46 +1,44 @@
-const { pool } = require('../config/db');
+const Transaction = require('../models/Transaction');
 
 exports.getAnalyticsSummary = async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT amount, type FROM transactions WHERE user_id = $1', [req.user.id]);
-    
-    let totalIncome = 0;
-    let totalExpenses = 0;
-    
-    rows.forEach(t => {
-      const amount = parseFloat(t.amount);
-      if (t.type === 'income') totalIncome += amount;
-      else totalExpenses += amount;
-    });
+    const transactions = await Transaction.find({ user: req.user.id }).select('amount type');
+    const totals = transactions.reduce((result, transaction) => {
+      if (transaction.type === 'income') result.totalIncome += Number(transaction.amount);
+      else result.totalExpenses += Number(transaction.amount);
+      return result;
+    }, { totalIncome: 0, totalExpenses: 0 });
 
     res.json({
-      totalIncome,
-      totalExpenses,
-      netSavings: totalIncome - totalExpenses
+      ...totals,
+      netSavings: totals.totalIncome - totals.totalExpenses,
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Fetching analytics summary failed:', error);
+    res.status(500).json({ message: 'Unable to fetch analytics summary' });
   }
 };
 
 exports.getAnalyticsForecast = async (req, res) => {
   try {
-    const { rows } = await pool.query(
-      `SELECT DATE_TRUNC('month', date)::date AS month,
-              COALESCE(SUM(amount) FILTER (WHERE type = 'income'), 0) AS income,
-              COALESCE(SUM(amount) FILTER (WHERE type = 'expense'), 0) AS expenses
-       FROM transactions
-       WHERE user_id = $1
-       GROUP BY DATE_TRUNC('month', date)
-       ORDER BY month DESC
-       LIMIT 12`,
-      [req.user.id]
-    );
+    const transactions = await Transaction.find({ user: req.user.id }).select('amount type date');
+    const monthlyTotals = new Map();
 
-    const months = rows.reverse().map(row => ({
-      income: Number(row.income),
-      expenses: Number(row.expenses),
-    }));
+    transactions.forEach(transaction => {
+      const date = new Date(transaction.date);
+      if (Number.isNaN(date.getTime())) return;
+
+      const monthKey = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+      const totals = monthlyTotals.get(monthKey) || { income: 0, expenses: 0 };
+      if (transaction.type === 'income') totals.income += Number(transaction.amount);
+      else totals.expenses += Number(transaction.amount);
+      monthlyTotals.set(monthKey, totals);
+    });
+
+    const months = [...monthlyTotals.entries()]
+      .sort(([first], [second]) => first.localeCompare(second))
+      .slice(-12)
+      .map(([, totals]) => totals);
     const recentMonths = months.slice(-3);
     const weights = recentMonths.map((_, index) => index + 1);
     const weightTotal = weights.reduce((total, weight) => total + weight, 0);
@@ -67,6 +65,7 @@ exports.getAnalyticsForecast = async (req, res) => {
         : 'Estimate uses a weighted average of your three most recent recorded months, giving more weight to recent behavior.',
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Fetching analytics forecast failed:', error);
+    res.status(500).json({ message: 'Unable to fetch analytics forecast' });
   }
 };

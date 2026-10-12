@@ -1,4 +1,7 @@
-const { pool } = require('../config/db');
+const Transaction = require('../models/Transaction');
+const Account = require('../models/Account');
+const Goal = require('../models/Goal');
+const Chat = require('../models/Chat');
 
 const formatMoney = amount => `$${Number(amount || 0).toFixed(2)}`;
 
@@ -30,8 +33,8 @@ const buildContext = (transactions, accounts, goals) => {
     accounts: accounts.map(account => ({ type: account.type, balance: Number(account.balance || 0) })),
     goals: goals.map(goal => ({
       title: goal.title,
-      target: Number(goal.target_amount || 0),
-      current: Number(goal.current_amount || 0),
+      target: Number(goal.targetAmount || 0),
+      current: Number(goal.currentAmount || 0),
       deadline: goal.deadline,
       status: goal.status,
     })),
@@ -81,15 +84,17 @@ const fallbackReply = (message, context, history) => {
 };
 
 exports.generateAIResponse = async (userId, message) => {
-  const [transactionResult, accountResult, goalResult, historyResult] = await Promise.all([
-    pool.query('SELECT name, amount, type, category, date FROM transactions WHERE user_id = $1 ORDER BY date DESC, created_at DESC', [userId]),
-    pool.query('SELECT type, bank_name, balance FROM accounts WHERE user_id = $1 ORDER BY updated_at DESC', [userId]),
-    pool.query('SELECT title, target_amount, current_amount, deadline, status FROM goals WHERE user_id = $1 ORDER BY deadline ASC', [userId]),
-    pool.query('SELECT message, response FROM chats WHERE user_id = $1 ORDER BY created_at DESC LIMIT 6', [userId]),
+  const [transactions, accounts, goals, historyResult] = await Promise.all([
+    Transaction.find({ user: userId })
+      .select('name amount type category date')
+      .sort({ date: -1, createdAt: -1 }),
+    Account.find({ userId }).select('type bankName balance').sort({ updatedAt: -1 }),
+    Goal.find({ userId }).select('title targetAmount currentAmount deadline status').sort({ deadline: 1 }),
+    Chat.find({ userId }).select('message response').sort({ createdAt: -1 }).limit(6),
   ]);
 
-  const context = buildContext(transactionResult.rows, accountResult.rows, goalResult.rows);
-  const history = historyResult.rows.reverse();
+  const context = buildContext(transactions, accounts, goals);
+  const history = historyResult.reverse();
 
   if (process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.startsWith('sk-proj-xxxx')) {
     try {
@@ -109,6 +114,7 @@ exports.generateAIResponse = async (userId, message) => {
       });
       const data = await response.json();
       if (data?.choices?.[0]?.message?.content) return data.choices[0].message.content.trim();
+      console.error('OpenAI returned no assistant message; using contextual fallback');
     } catch (error) {
       console.error('OpenAI failed, using contextual fallback:', error.message);
     }

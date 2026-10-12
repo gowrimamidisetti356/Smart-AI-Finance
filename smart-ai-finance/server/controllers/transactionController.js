@@ -1,39 +1,55 @@
-const { pool } = require('../config/db');
+const mongoose = require('mongoose');
+const Transaction = require('../models/Transaction');
+const serializeDocument = require('../utils/serializeDocument');
 
 exports.getTransactions = async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT * FROM transactions WHERE user_id = $1 ORDER BY date DESC', [req.user.id]);
-    res.json(rows);
+    const transactions = await Transaction.find({ user: req.user.id }).sort({ date: -1, createdAt: -1 });
+    res.json(transactions.map(transaction => serializeDocument(transaction, { createdAt: 'created_at' })));
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Fetching transactions failed:', error);
+    res.status(500).json({ message: 'Unable to fetch transactions' });
   }
 };
 
 exports.addTransaction = async (req, res) => {
-  const { name, amount, type, category, date } = req.body;
+  const { name, amount, type, category, date } = req.body || {};
+  if (typeof name !== 'string' || !name.trim() || !Number.isFinite(Number(amount))
+    || !['income', 'expense'].includes(type) || typeof category !== 'string' || !category.trim()
+    || !date || Number.isNaN(Date.parse(date))) {
+    return res.status(400).json({ message: 'A name, valid amount, type, category, and date are required' });
+  }
+
   try {
-    const { rows } = await pool.query(
-      'INSERT INTO transactions (user_id, name, amount, type, category, date) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [req.user.id, name, amount, type, category, date]
-    );
-    res.status(201).json(rows[0]);
+    const transaction = await Transaction.create({
+      user: req.user.id,
+      name: name.trim(),
+      amount: Number(amount),
+      type,
+      category: category.trim(),
+      date: new Date(date),
+    });
+    res.status(201).json(serializeDocument(transaction, { createdAt: 'created_at' }));
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    if (error.name === 'ValidationError' || error.name === 'CastError') {
+      return res.status(400).json({ message: 'Invalid transaction data' });
+    }
+    console.error('Creating transaction failed:', error);
+    res.status(500).json({ message: 'Unable to create transaction' });
   }
 };
 
 exports.deleteTransaction = async (req, res) => {
-  try {
-    const { rows } = await pool.query('SELECT * FROM transactions WHERE id = $1', [req.params.id]);
-    if (rows.length === 0) return res.status(404).json({ message: 'Transaction not found' });
-    
-    if (rows[0].user_id !== req.user.id) {
-      return res.status(401).json({ message: 'User not authorized' });
-    }
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(400).json({ message: 'Invalid transaction ID' });
+  }
 
-    await pool.query('DELETE FROM transactions WHERE id = $1', [req.params.id]);
-    res.json({ id: req.params.id });
+  try {
+    const transaction = await Transaction.findOneAndDelete({ _id: req.params.id, user: req.user.id });
+    if (!transaction) return res.status(404).json({ message: 'Transaction not found' });
+    res.json({ id: transaction.id });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Deleting transaction failed:', error);
+    res.status(500).json({ message: 'Unable to delete transaction' });
   }
 };

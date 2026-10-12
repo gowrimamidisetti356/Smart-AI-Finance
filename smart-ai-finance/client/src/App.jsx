@@ -1,20 +1,20 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useCallback } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider, useToast } from './context/ToastContext';
 import { CurrencyProvider } from './context/CurrencyContext';
-import AuthPage from './components/auth/AuthPage';
+const AuthPage = lazy(() => import('./components/auth/AuthPage'));
 import Sidebar from './components/layout/Sidebar';
 import Navbar from './components/layout/Navbar';
-import DashboardView from './components/dashboard/DashboardView';
-import TransactionsView from './components/transactions/TransactionsView';
+const DashboardView = lazy(() => import('./components/dashboard/DashboardView'));
+const TransactionsView = lazy(() => import('./components/transactions/TransactionsView'));
 import AddTransactionModal from './components/transactions/AddTransactionModal';
-import AnalyticsView from './components/analytics/AnalyticsView';
-import GoalsView from './components/goals/GoalsView';
-import AIAssistantView from './components/ai/AIAssistantView';
-import AccountsView from './components/accounts/AccountsView';
-import ReceiptScannerView from './components/receipts/ReceiptScannerView';
-import SettingsView from './components/settings/SettingsView';
+const AnalyticsView = lazy(() => import('./components/analytics/AnalyticsView'));
+const GoalsView = lazy(() => import('./components/goals/GoalsView'));
+const AIAssistantView = lazy(() => import('./components/ai/AIAssistantView'));
+const AccountsView = lazy(() => import('./components/accounts/AccountsView'));
+const ReceiptScannerView = lazy(() => import('./components/receipts/ReceiptScannerView'));
+const SettingsView = lazy(() => import('./components/settings/SettingsView'));
 import {
   transactionsApi,
   analyticsApi,
@@ -199,7 +199,11 @@ function MainApp() {
 
   // If not authenticated, show modern AuthPage
   if (!isAuthenticated) {
-    return <AuthPage />;
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-slate-900" role="status">Loading sign-in...</div>}>
+        <AuthPage />
+      </Suspense>
+    );
   }
 
   return (
@@ -233,68 +237,70 @@ function MainApp() {
 
         {/* Page Content Container */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto animate-fadeIn">
-          {activePage === 'Dashboard' && (
-            <DashboardView
-              transactions={transactions}
-              summary={summary}
-              goals={goals}
-              isLoading={isDataLoading}
-              onOpenAddTransaction={() => setIsAddTxModalOpen(true)}
-              onNavigate={(page) => setActivePage(page)}
-            />
-          )}
+          <Suspense fallback={<div className="py-12 text-center text-slate-500" role="status">Loading page...</div>}>
+            {activePage === 'Dashboard' && (
+              <DashboardView
+                transactions={transactions}
+                summary={summary}
+                goals={goals}
+                isLoading={isDataLoading}
+                onOpenAddTransaction={() => setIsAddTxModalOpen(true)}
+                onNavigate={(page) => setActivePage(page)}
+              />
+            )}
 
-          {activePage === 'Transactions' && (
-            <TransactionsView
-              transactions={transactions}
-              onDeleteTransaction={handleDeleteTransaction}
-              onOpenAddTransaction={() => setIsAddTxModalOpen(true)}
-              searchTerm={searchTerm}
-              setSearchTerm={setSearchTerm}
-            />
-          )}
+            {activePage === 'Transactions' && (
+              <TransactionsView
+                transactions={transactions}
+                onDeleteTransaction={handleDeleteTransaction}
+                onOpenAddTransaction={() => setIsAddTxModalOpen(true)}
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
+              />
+            )}
 
-          {activePage === 'Analytics' && (
-            <AnalyticsView
-              transactions={transactions}
-              summary={summary}
-              onNavigate={(page) => setActivePage(page)}
-            />
-          )}
+            {activePage === 'Analytics' && (
+              <AnalyticsView
+                transactions={transactions}
+                summary={summary}
+                onNavigate={(page) => setActivePage(page)}
+              />
+            )}
 
-          {activePage === 'Goals' && (
-            <GoalsView
-              goals={goals}
-              onAddGoal={handleAddGoal}
-              onUpdateGoal={handleUpdateGoal}
-              onDeleteGoal={handleDeleteGoal}
-            />
-          )}
+            {activePage === 'Goals' && (
+              <GoalsView
+                goals={goals}
+                onAddGoal={handleAddGoal}
+                onUpdateGoal={handleUpdateGoal}
+                onDeleteGoal={handleDeleteGoal}
+              />
+            )}
 
-          {activePage === 'AI Assistant' && <AIAssistantView />}
+            {activePage === 'AI Assistant' && <AIAssistantView />}
 
-          {activePage === 'Accounts' && (
-            <AccountsView
-              accounts={accounts}
-              onAddAccount={handleAddAccount}
-              onDeleteAccount={handleDeleteAccount}
-            />
-          )}
+            {activePage === 'Accounts' && (
+              <AccountsView
+                accounts={accounts}
+                onAddAccount={handleAddAccount}
+                onDeleteAccount={handleDeleteAccount}
+              />
+            )}
 
-          {activePage === 'Receipt Scanner' && (
-            <ReceiptScannerView
-              onAddTransaction={handleAddTransaction}
-              onNavigate={(page) => setActivePage(page)}
-            />
-          )}
+            {activePage === 'Receipt Scanner' && (
+              <ReceiptScannerView
+                onAddTransaction={handleAddTransaction}
+                onNavigate={(page) => setActivePage(page)}
+              />
+            )}
 
-          {activePage === 'Settings' && (
-            <SettingsView
-              transactions={transactions}
-              goals={goals}
-              accounts={accounts}
-            />
-          )}
+            {activePage === 'Settings' && (
+              <SettingsView
+                transactions={transactions}
+                goals={goals}
+                accounts={accounts}
+              />
+            )}
+          </Suspense>
         </main>
       </div>
 
