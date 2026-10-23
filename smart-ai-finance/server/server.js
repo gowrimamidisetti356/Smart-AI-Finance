@@ -1,3 +1,4 @@
+
 const express = require('express');
 const path = require('path');
 const dotenv = require('dotenv');
@@ -10,8 +11,18 @@ const { connectDB } = require('./config/db');
 
 const app = express();
 
+// Middleware
 app.use(cors());
 app.use(express.json());
+
+// Root route: confirm that the backend is running.
+app.get('/', (req, res) => {
+  res.status(200).json({
+    message: 'Smart AI Finance API is running',
+    status: 'OK',
+    health: '/api/health'
+  });
+});
 
 // Initialize MongoDB connection once and reuse it.
 let dbInitialization;
@@ -39,7 +50,7 @@ app.use('/api', async (req, res, next) => {
       message:
         error.code === 'DATABASE_CONFIG'
           ? error.message
-          : 'Database unavailable. Check MONGODB_URI credentials and MongoDB Atlas network access.',
+          : 'Database unavailable. Check MONGODB_URI credentials and MongoDB Atlas network access.'
     });
   }
 });
@@ -50,7 +61,7 @@ app.get('/api/health', (req, res) => {
 
   return res.status(connected ? 200 : 503).json({
     status: connected ? 'ok' : 'error',
-    database: connected ? 'connected' : 'disconnected',
+    database: connected ? 'connected' : 'disconnected'
   });
 });
 
@@ -62,7 +73,7 @@ const goalRoutes = require('./routes/goalRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const accountRoutes = require('./routes/accountRoutes');
 
-// Mount routes
+// Mount existing API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/analytics', analyticsRoutes);
@@ -72,8 +83,8 @@ app.use('/api/accounts', accountRoutes);
 
 const PORT = process.env.PORT || 5000;
 
-// Local development: verify MongoDB before starting the server.
-// Vercel can initialize the connection through the API middleware above.
+// Local development: connect to MongoDB before starting Express.
+// Vercel can initialize the connection through the API middleware.
 if (require.main === module) {
   initializeDB()
     .then(() => {
@@ -89,4 +100,5 @@ if (require.main === module) {
     });
 }
 
+// Export the Express app for Vercel.
 module.exports = app;
