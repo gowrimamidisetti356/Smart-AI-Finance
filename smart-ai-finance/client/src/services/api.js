@@ -1,4 +1,5 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+
+const API_BASE_URL = `${(import.meta.env.VITE_API_URL || '').replace(/\/+$/, '')}/api`;
 
 /**
  * Helper to get the auth token from localStorage
@@ -8,10 +9,12 @@ export const getAuthToken = () => {
 };
 
 /**
- * Generic fetch wrapper with automatic JWT token attachment and error handling
+ * Generic fetch wrapper with automatic JWT token attachment
+ * and error handling
  */
 async function request(endpoint, options = {}) {
   const token = getAuthToken();
+
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -23,14 +26,20 @@ async function request(endpoint, options = {}) {
     headers,
   };
 
-  const url = `${API_BASE_URL}${endpoint}`;
+  // Ensure the endpoint starts with exactly one slash.
+  const normalizedEndpoint = `/${endpoint.replace(/^\/+/, '')}`;
+  const url = `${API_BASE_URL}${normalizedEndpoint}`;
 
   try {
     const response = await fetch(url, config);
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      const errorMsg = data.message || data.error || `HTTP Error ${response.status}: ${response.statusText}`;
+      const errorMsg =
+        data.message ||
+        data.error ||
+        `HTTP Error ${response.status}: ${response.statusText}`;
+
       const error = new Error(errorMsg);
       error.status = response.status;
       error.data = data;
@@ -39,7 +48,10 @@ async function request(endpoint, options = {}) {
 
     return data;
   } catch (err) {
-    console.error(`API Request failed for [${options.method || 'GET'} ${endpoint}]:`, err.message);
+    console.error(
+      `API Request failed for [${options.method || 'GET'} ${normalizedEndpoint}]:`,
+      err.message
+    );
     throw err;
   }
 }
