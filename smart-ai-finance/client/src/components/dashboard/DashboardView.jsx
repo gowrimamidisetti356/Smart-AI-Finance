@@ -366,8 +366,8 @@ export default function DashboardView({
             </div>
           </div>
 
-          <div className="h-64 sm:h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-64 sm:h-72 w-full min-w-0 min-h-[16rem]">
+            <ResponsiveContainer width="100%" height="100%" minHeight={220}>
               <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                 <defs>
                   <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
@@ -439,8 +439,8 @@ export default function DashboardView({
             </p>
           </div>
 
-          <div className="h-52 w-full my-2">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-52 w-full my-2 min-w-0 min-h-[13rem]">
+            <ResponsiveContainer width="100%" height="100%" minHeight={180}>
               <PieChart>
                 <Pie
                   data={categoryData}
